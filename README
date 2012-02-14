@@ -33,7 +33,11 @@ Pwrake - Parallel and Distributed Ruby
 
     $ pdrb test/t.rb
 
-* Class methods
+* Class method
+
+ - Communicator.instance #=> communicator
+
+* Instance methods
 
  - Communicator#rank
  - Communicator#size
