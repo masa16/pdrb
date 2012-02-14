@@ -19,6 +19,8 @@ Pwrake - Parallel and Distributed Ruby
     host3
     ..
 
+ - enable ssh-login to rhosts w/o passwd
+
  - demo program
 
     $ cat test/t.rb
