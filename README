@@ -1,0 +1,41 @@
+Pwrake - Parallel and Distributed Ruby
+                   Masahiro Tanaka 2012-02-14
+
+* Tested for
+
+ - ruby 1.9.2p0
+
+* Install
+
+ $ ruby setup.rb
+
+* How to use
+
+ - create `rhosts' file : list of remote hosts
+
+    $ cat rhosts
+    host1
+    host2
+    host3
+    ..
+
+ - demo program
+
+    $ cat test/t.rb
+    comm = Communicator.instance
+    rank = comm.rank
+    size = comm.size
+    data = [rank,`hostname`.chomp]
+    comm.send((rank+1)%size,0,data)
+    p [:send, data, :recv, comm.recv((rank-1)%size,0)]
+
+ - run
+
+    $ pdrb test/t.rb
+
+* Class methods
+
+ - Communicator#rank
+ - Communicator#size
+ - Communicator#send(rank,tag,obj)
+ - Communicator#recv(rank,tag) #=> obj

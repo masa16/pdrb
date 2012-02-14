@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+require "thread"
+require "socket"
+require "shellwords"
+
+class PDRBMaster
+
+  def initialize(args)
+    @args=args.map{|x| Shellwords.escape(x)}.join(" ")
+    # read rhosts
+    @rhosts=[]
+    File.readlines('rhosts').each do |x|
+      x.sub!(/#.*$/,"")
+      x.strip!
+      @rhosts.push x if !x.empty?
+    end
+  end
+
+  def run
+    setup
+    main_loop
+  end
+
+  def setup
+    # start server
+    @server = TCPServer.open(0)
+    addr = @server.addr
+    @host = `hostname -f`.chomp
+    @port = addr[1]
+
+    # start workers
+    @rsh = (0...@rhosts.size).map do |rank|
+      env = Shellwords.escape("#{@host} #{@port} #{rank}")
+      cmd = "ssh -x -T -q #{@rhosts[rank]} "+
+        "'cd #{Dir.pwd}; PDRB_INFO=#{env} "+
+        "exec ruby -r./pdrb.rb #{@args}'"
+      IO.popen(cmd, "r+")
+    end
+
+    # wait for worker response
+    socks = [@server]
+    q = (0..@rhosts.size-1).to_a
+    @rinfo=[]
+    while !q.empty?
+      next unless nsock = select(socks)
+      for s in nsock[0]
+        if s == @server
+          socks.push(s.accept)
+        elsif s.eof?
+          s.close
+          socks.delete(s)
+        else
+          rank,port,pid = Marshal.load(s)
+          @rinfo[rank] = [@rhosts[rank],port,pid]
+          q.delete(rank)
+        end
+      end
+    end
+
+    set_signal_trap
+
+    # notify worker
+    @rhosts.size.times do |i|
+      s = TCPSocket.open(*@rinfo[i][0..1])
+      Marshal.dump([i,@rinfo], s)
+      s.close
+    end
+  end
+
+  def main_loop
+    # receive remote stdout
+    while !@rsh.empty?
+      next unless remote = select(@rsh)
+      for f in remote[0]
+        if f.eof?
+          f.close
+          @rsh.delete(f)
+        else
+          puts f.gets.chomp
+        end
+      end
+    end
+  end
+
+  def set_signal_trap
+    [:INT, :TERM].each do |sig|
+      Signal.trap(sig) do
+        @rhosts.size.times do |i|
+          cmd="ssh -x -T -q #{@rhosts[i]} kill -s #{sig} #{@rinfo[i][2]}"
+          IO.popen(cmd)
+        end
+        exit
+      end
+    end
+  end
+end
+
+PDRBMaster.new(ARGV).run
