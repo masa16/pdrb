@@ -1,4 +1,4 @@
-#! /home/tanakams/local/bin/ruby
+#! /usr/bin/ruby
 require "socket"
 require "shellwords"
 
